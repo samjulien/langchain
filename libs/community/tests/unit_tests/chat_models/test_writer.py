@@ -80,6 +80,7 @@ class TestChatWriter:
             "tool_call_id": "call_abc123",
         }
         result = ChatWriter._convert_writer_to_langchain(message)
+
         assert isinstance(result, ToolMessage)
         assert result.name == "get_number"
         assert result.content == content
@@ -101,6 +102,7 @@ class TestChatWriter:
             ],
         }
         result = ChatWriter._convert_writer_to_langchain(message)
+
         assert isinstance(result, AIMessage)
         assert result.tool_calls
         assert len(result.tool_calls) == 1

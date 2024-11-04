@@ -301,7 +301,7 @@ class ChatWriter(BaseChatModel):
         params = {**params, **kwargs}
         response = await self.async_client.chat.chat(messages=message_dicts, **params)
         return self._create_chat_result(response)
-
+      
     def bind_tools(
         self,
         tools: Sequence[Union[Dict[str, Any], Type[BaseModel], Callable]],
