@@ -28,8 +28,6 @@ from langchain_core.callbacks import (
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.language_models.chat_models import (
     BaseChatModel,
-    agenerate_from_stream,
-    generate_from_stream,
 )
 from langchain_core.messages import (
     AIMessage,
@@ -110,17 +108,17 @@ class ChatWriter(BaseChatModel):
         }
 
     @model_validator(mode="before")
-    def initialize_clients(cls, variables):
+    def initialize_clients(cls, variables: Any) -> Any:
         if not variables.get("api_key", ""):
             variables["api_key"] = os.getenv("WRITER_API_KEY", "")
 
-        if not variables["api_key"]:
-            raise Exception("Writer API key not set")
-        else:
+        if variables["api_key"]:
             if not variables.get("client"):
                 variables["client"] = Writer(api_key=variables["api_key"])
             if not variables.get("async_client"):
                 variables["async_client"] = AsyncWriter(api_key=variables["api_key"])
+        else:
+            raise Exception("Writer API key not set")
 
         return variables
 
@@ -134,13 +132,12 @@ class ChatWriter(BaseChatModel):
             )
             generations.append(gen)
 
-        token_usage = response.usage
+        token_usage = {}
+
+        if response.usage:
+            token_usage = response.usage.__dict__
         llm_output = {
-            "token_usage": {
-                "completion_tokens": token_usage.completion_tokens,
-                "prompt_tokens": token_usage.prompt_tokens,
-                "total_tokens": token_usage.total_tokens,
-            },
+            "token_usage": token_usage,
             "model_name": self.model_name,
             "system_fingerprint": response.system_fingerprint,
         }
@@ -189,7 +186,9 @@ class ChatWriter(BaseChatModel):
             )
 
         role = response_message.get("role", "")
-        content = response_message.get("content", "")
+        content = response_message.get("content")
+        if not content:
+            content = ""
 
         if role == "user":
             return HumanMessage(content=content)
@@ -212,6 +211,7 @@ class ChatWriter(BaseChatModel):
     def _convert_messages_to_writer(
         self, messages: List[BaseMessage], stop: Optional[List[str]] = None
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """Convert a list f LandChain messages to List of Writer dict messages."""
         params = {
             "model": self.model_name,
             "temperature": self.temperature,

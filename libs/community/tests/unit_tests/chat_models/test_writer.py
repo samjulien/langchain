@@ -17,6 +17,8 @@ from writerai.types.chat import (
     ChoiceLogprobsRefusal,
     ChoiceLogprobsRefusalTopLogprob,
     ChoiceMessage,
+    ChoiceMessageToolCall,
+    ChoiceMessageToolCallFunction,
     Usage,
 )
 from writerai.types.chat_completion_chunk import ChatCompletionChunk, ChoiceDelta
@@ -148,30 +150,54 @@ class TestChatWriter:
         )
 
     @pytest.fixture(autouse=True)
-    def mock_tool_call_choice_response(self) -> Dict[str, Any]:
-        response = {
-            "id": "chat-12345",
-            "choices": [
-                {
-                    "message": {
-                        "role": "assistant",
-                        "content": "",
-                        "tool_calls": [
-                            {
-                                "id": "call_abc123",
-                                "type": "function",
-                                "function": {
-                                    "name": "GetWeather",
-                                    "arguments": '{"location": "London"}',
-                                },
-                            }
+    def mock_tool_call_choice_response(self) -> Chat:
+        return Chat(
+            id="chat-12345",
+            object="chat.completion",
+            created=1699000000,
+            model="palmyra-x-004",
+            choices=[
+                Choice(
+                    index=0,
+                    finish_reason="tool_calls",
+                    logprobs=ChoiceLogprobs(
+                        content=[
+                            ChoiceLogprobsContent(
+                                token="",
+                                logprob=0,
+                                top_logprobs=[
+                                    ChoiceLogprobsContentTopLogprob(token="", logprob=0)
+                                ],
+                            )
                         ],
-                    },
-                    "finish_reason": "tool_calls",
-                }
+                        refusal=[
+                            ChoiceLogprobsRefusal(
+                                token="",
+                                logprob=0,
+                                top_logprobs=[
+                                    ChoiceLogprobsRefusalTopLogprob(token="", logprob=0)
+                                ],
+                            )
+                        ],
+                    ),
+                    message=ChoiceMessage(
+                        role="assistant",
+                        content="",
+                        refusal="",
+                        tool_calls=[
+                            ChoiceMessageToolCall(
+                                id="call_abc123",
+                                type="function",
+                                function=ChoiceMessageToolCallFunction(
+                                    name="GetWeather",
+                                    arguments='{"location": "London"}',
+                                ),
+                            )
+                        ],
+                    ),
+                )
             ],
-        }
-        return response
+        )
 
     @pytest.fixture(autouse=True)
     def mock_streaming_chunks(self) -> List[ChatCompletionChunk]:
@@ -241,7 +267,6 @@ class TestChatWriter:
         callback_manager = CallbackManager([callback_handler])
 
         chat = ChatWriter(
-            streaming=True,
             callback_manager=callback_manager,
             max_tokens=10,
             api_key=SecretStr("test-key"),
@@ -256,13 +281,13 @@ class TestChatWriter:
             message = HumanMessage(content="Hi")
             response = chat.stream([message])
 
-            message = ""
+            response_message = ""
 
             for chunk in response:
-                message += chunk.content
+                response_message += str(chunk.content)
 
             assert callback_handler.llm_streams > 0
-            assert message == "Hello! How can I help you?"
+            assert response_message == "Hello! How can I help you?"
 
     async def test_async_streaming(
         self, mock_streaming_chunks: List[ChatCompletionChunk]
@@ -272,7 +297,6 @@ class TestChatWriter:
         callback_manager = CallbackManager([callback_handler])
 
         chat = ChatWriter(
-            streaming=True,
             callback_manager=callback_manager,
             max_tokens=10,
             api_key=SecretStr("test-key"),
@@ -287,13 +311,13 @@ class TestChatWriter:
             message = HumanMessage(content="Hi")
             response = chat.astream([message])
 
-            message = ""
+            response_message = ""
 
             async for chunk in response:
-                message += chunk.content
+                response_message += str(chunk.content)
 
             assert callback_handler.llm_streams > 0
-            assert message == "Hello! How can I help you?"
+            assert response_message == "Hello! How can I help you?"
 
     def test_sync_tool_calling(
         self, mock_tool_call_choice_response: Dict[str, Any]
